@@ -9,7 +9,10 @@ LIBCAMERA_OPTIONS=()
 while IFS= read -r line; do
     # コメント行を無視
     [[ $line == \#* ]] && continue
-    LIBCAMERA_OPTIONS+=("$line")  # オプションを配列に追加
+    # 空行を無視
+    [[ -z $line ]] && continue
+    # オプションを配列に追加
+    LIBCAMERA_OPTIONS+=($line)
 done < .libcamera_options
 
 # 画像の保存先を /tmp に設定
