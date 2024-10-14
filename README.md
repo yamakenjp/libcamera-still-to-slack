@@ -17,8 +17,8 @@
 
 1. **リポジトリをクローンします**。
     ```bash
-    git clone https://github.com/yamakenjp/rpicam-still-to-slack.git
-    cd rpicam-still-to-slack
+    git clone https://github.com/yamakenjp/libcamera-still-to-slack.git
+    cd libcamera-still-to-slack
     ```
 
 2. **サンプル設定ファイルをコピーします**。
