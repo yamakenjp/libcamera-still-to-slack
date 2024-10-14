@@ -1,4 +1,4 @@
-# rpicam-still-to-slack
+# libcamera-still-to-slack
 
 このプロジェクトは、Raspberry Piカメラを使って画像を撮影し、その画像をSlackに投稿するためのスクリプトです。
 
