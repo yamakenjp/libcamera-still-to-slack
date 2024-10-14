@@ -2,7 +2,6 @@
 
 # 設定ファイルを読み込む
 source .slack_option
-source .libcamera_options
 
 # libcamera_optionsを読み込む
 LIBCAMERA_OPTIONS=()
