@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 設定ファイルを読み込む
-source .slack_option
+source /home/pi/libcamera-still-to-slack/.slack_option
 
 # 画像の保存先を /tmp に設定
 IMAGE_PATH="/tmp/image.jpg"
