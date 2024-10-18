@@ -24,20 +24,20 @@ sunset=$(echo "$response" | grep -oP '"sunset":"\K[^"]+')
 sunrise_jst=$(date -d "$sunrise" +"%Y-%m-%d %H:%M:%S")
 sunset_jst=$(date -d "$sunset" +"%Y-%m-%d %H:%M:%S")
 
-# 日の出30分前と日没30分後の時間を計算
-sunrise_minus_30=$(date -d "$sunrise - 30 minutes" +"%Y-%m-%d %H:%M:%S")
-sunset_plus_30=$(date -d "$sunset + 30 minutes" +"%Y-%m-%d %H:%M:%S")
+# 日の出15分前と日没15分後の時間を計算
+sunrise_minus_15=$(date -d "$sunrise - 15 minutes" +"%Y-%m-%d %H:%M:%S")
+sunset_plus_15=$(date -d "$sunset + 15 minutes" +"%Y-%m-%d %H:%M:%S")
 
 # 現在の時刻を取得
 current_time=$(date +"%Y-%m-%d %H:%M:%S")
 
-# 日の出30分前から日没後30分までの間かどうかを確認
-if [[ "$current_time" > "$sunrise_minus_30" ]] && [[ "$current_time" < "$sunset_plus_30" ]]; then
-  echo "昼モードで撮影します（日の出30分前から日没後30分まで）"
+# 日の出15分前から日没後15分までの間かどうかを確認
+if [[ "$current_time" > "$sunrise_minus_15" ]] && [[ "$current_time" < "$sunset_plus_15" ]]; then
+  echo "昼モードで撮影します（日の出15分前から日没後15分まで）"
   # rpicam-jpeg コマンドを実行
   rpicam-jpeg -n --lens-position default --hdr auto --autofocus-mode auto --autofocus-speed fast --metering average -o "$IMAGE_PATH"
 else
-  echo "夜モードで撮影します（日没後30分から日の出30分前まで）"
+  echo "夜モードで撮影します（日没後15分から日の出15分前まで）"
   # rpicam-jpeg コマンドを実行
   rpicam-jpeg -n --lens-position default --shutter 100000000 --hdr auto --autofocus-mode auto --autofocus-speed fast --metering average -o "$IMAGE_PATH"
 fi
