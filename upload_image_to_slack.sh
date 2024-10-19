@@ -32,7 +32,7 @@ sunset_plus_15=$(date -d "$sunset + 15 minutes" +"%Y-%m-%d %H:%M:%S")
 current_time=$(date +"%Y-%m-%d %H:%M:%S")
 
 # 日の出15分前から日没後15分までの間かどうかを確認
-if [[ "$current_time" > "$sunrise_minus_15" ]] && [[ "$current_time" < "$sunset_plus_15" ]]; then
+if [[ "$current_time" > "$sunrise_minus_15" ]] || [[ "$current_time" < "$sunset_plus_15" ]]; then
   echo "昼モードで撮影します（日の出15分前から日没後15分まで）"
   # rpicam-jpeg コマンドを実行
   rpicam-jpeg -n --lens-position default --hdr auto --autofocus-mode auto --autofocus-speed fast --metering average -o "$IMAGE_PATH"
