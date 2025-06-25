@@ -1,5 +1,5 @@
-# upload_image_to_slack.sh
 #!/bin/bash
+# upload_image_to_slack.sh
 # vim: set filetype=sh
 set -euo pipefail
 
@@ -19,7 +19,7 @@ LATITUDE=43.1703
 LONGITUDE=141.3544
 
 # --------------------------------------------------
-# 当日のJST日付を指定して日の出・日の入りを取得
+# 当日のJST日付指定で日の出・日の入りを取得
 # --------------------------------------------------
 LOCAL_DATE="$(date +'%Y-%m-%d')"
 response=$(curl -s \
@@ -40,8 +40,8 @@ current_ts=$(date +%s)
 
 # --------------------------------------------------
 # 撮影モード判定：  
-#   ・日の出15分前～日の入り15分後 → 昼モード  
-#   ・それ以外                   → 夜モード  
+#   日の出15分前～日の入り15分後 → 昼モード  
+#   それ以外                   → 夜モード  
 # --------------------------------------------------
 if [[ $current_ts -ge $sunrise_minus_15_ts && $current_ts -lt $sunset_plus_15_ts ]]; then
   echo "昼モードで撮影します"
@@ -72,6 +72,17 @@ else
     --metering average \
     -o "$IMAGE_PATH"
 fi
+
+# --------------------------------------------------
+# EXIF に撮影時刻を埋め込む（ExifTool）
+# --------------------------------------------------
+# 事前に `sudo apt-get install libimage-exiftool-perl` しておくこと
+TIMESTAMP="$(date +'%Y:%m:%d %H:%M:%S')"
+exiftool -overwrite_original \
+  -DateTimeOriginal="$TIMESTAMP" \
+  -CreateDate="$TIMESTAMP" \
+  -ModifyDate="$TIMESTAMP" \
+  "$IMAGE_PATH"
 
 # --------------------------------------------------
 # Slack への非同期アップロード処理
