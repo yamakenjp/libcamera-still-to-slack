@@ -1,3 +1,4 @@
+# upload_image_to_slack.sh
 #!/bin/bash
 # vim: set filetype=sh
 set -euo pipefail
@@ -30,25 +31,24 @@ sunset=$(echo "$response"  | grep -oP '"sunset":"\K[^"]+')
 sunrise_jst=$(date -d "$sunrise" +"%Y-%m-%d %H:%M:%S")
 sunset_jst=$(date -d "$sunset"  +"%Y-%m-%d %H:%M:%S")
 
-# エポック秒に変換
+# --------------------------------------------------
+# エポック秒に変換および9:00判定
+# --------------------------------------------------
 sunrise_ts=$(date --date="$sunrise_jst" +%s)
 sunset_ts=$(date --date="$sunset_jst"  +%s)
 sunrise_minus_15_ts=$(date --date="$sunrise_jst - 15 minutes" +%s)
 sunset_plus_15_ts=$(date --date="$sunset_jst + 15 minutes" +%s)
-
-# 当日 9:00 JST のエポック秒
 nine_am_ts=$(date --date "$(date +'%Y-%m-%d') 09:00:00" +%s)
-
 current_ts=$(date +%s)
 
 # --------------------------------------------------
-# 昼／夜モード判定および撮影
+# 撮影モード判定および撮影
 #  → 日の出〜9:00 は必ず昼モード
 #    それ以外は日の出15分前〜日の入り15分後を昼モードとする
 # --------------------------------------------------
 if \
-   [[ $current_ts -ge $sunrise_ts   && $current_ts -lt $nine_am_ts   ]] \
-|| [[ $current_ts -ge $sunrise_minus_15_ts && $current_ts -lt $sunset_plus_15_ts ]]; then
+   [[ $current_ts -ge $sunrise_ts           && $current_ts -lt $nine_am_ts       ]] \
+|| [[ $current_ts -ge $sunrise_minus_15_ts  && $current_ts -lt $sunset_plus_15_ts ]]; then
   echo "昼モードで撮影します"
   rpicam-jpeg -n \
     --lens-position default \
