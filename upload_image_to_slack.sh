@@ -6,7 +6,7 @@ set -euo pipefail
 # --------------------------------------------------
 # 設定ファイルを絶対パスで読み込み
 # --------------------------------------------------
-source ./home/pi/libcamera-still-to-slack/.slack_option
+source /home/pi/libcamera-still-to-slack/.slack_option
 
 # --------------------------------------------------
 # 変数定義
