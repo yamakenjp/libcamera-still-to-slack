@@ -1,7 +1,7 @@
 # .slack_option
 
 # Slack APIトークン
-TOKEN="xoxb-xxxxxxxxxxx-xxxxxxxxxxxx-xxxxxxxxxxxx"
+SLACK_TOKEN="xoxb-xxxxxxxxxxx-xxxxxxxxxxxx-xxxxxxxxxxxx"
 
 # SlackチャンネルID
 CHANNEL="C1234567890"
