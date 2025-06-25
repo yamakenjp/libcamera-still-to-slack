@@ -1,5 +1,5 @@
-#!/bin/bash
 # upload_image_to_slack.sh
+#!/bin/bash
 # vim: set filetype=sh
 set -euo pipefail
 
@@ -19,10 +19,11 @@ LATITUDE=43.1703
 LONGITUDE=141.3544
 
 # --------------------------------------------------
-# API で日の出・日の入りを取得（JSTローカル日付を明示）
+# 当日のJST日付を指定して日の出・日の入りを取得
 # --------------------------------------------------
 LOCAL_DATE="$(date +'%Y-%m-%d')"
-response=$(curl -s "https://api.sunrise-sunset.org/json?lat=${LATITUDE}&lng=${LONGITUDE}&date=${LOCAL_DATE}&formatted=0")
+response=$(curl -s \
+  "https://api.sunrise-sunset.org/json?lat=${LATITUDE}&lng=${LONGITUDE}&date=${LOCAL_DATE}&formatted=0")
 sunrise_iso=$(echo "$response" | grep -oP '"sunrise":"\K[^"]+')
 sunset_iso=$(echo "$response"  | grep -oP '"sunset":"\K[^"]+')
 
@@ -31,38 +32,27 @@ sunrise_jst=$(date -d "$sunrise_iso" +"%Y-%m-%d %H:%M:%S")
 sunset_jst=$(date -d "$sunset_iso"  +"%Y-%m-%d %H:%M:%S")
 
 # --------------------------------------------------
-# エポック秒に変換および9:00判定
+# エポック秒変換（撮影ウィンドウ：日の出15分前～日の入り15分後）
 # --------------------------------------------------
-sunrise_ts=$(date -d "$sunrise_jst" +%s)
-sunset_ts=$(date -d "$sunset_jst"  +%s)
 sunrise_minus_15_ts=$(date -d "$sunrise_jst - 15 minutes" +%s)
 sunset_plus_15_ts=$(date -d "$sunset_jst + 15 minutes" +%s)
-nine_am_ts=$(date -d "${LOCAL_DATE} 09:00:00" +%s)
 current_ts=$(date +%s)
 
 # --------------------------------------------------
-# 撮影モード判定
-#  1) 日の出前 → 夜モード
-#  2) 日の出～9:00 → 昼モード
-#  3) 日の出15分前～日の入り15分後 → 昼モード
-#  4) その他 → 夜モード
+# 撮影モード判定：  
+#   ・日の出15分前～日の入り15分後 → 昼モード  
+#   ・それ以外                   → 夜モード  
 # --------------------------------------------------
-if   [[ $current_ts -lt $sunrise_ts ]]; then
-  echo "夜モードで撮影します（まだ日の出前）"
-  MODE=night
-elif [[ $current_ts -lt $nine_am_ts ]]; then
-  echo "昼モードで撮影します（日の出～9:00）"
-  MODE=day
-elif [[ $current_ts -ge $sunrise_minus_15_ts && $current_ts -lt $sunset_plus_15_ts ]]; then
-  echo "昼モードで撮影します（標準ウィンドウ内）"
+if [[ $current_ts -ge $sunrise_minus_15_ts && $current_ts -lt $sunset_plus_15_ts ]]; then
+  echo "昼モードで撮影します"
   MODE=day
 else
-  echo "夜モードで撮影します（標準ウィンドウ外）"
+  echo "夜モードで撮影します"
   MODE=night
 fi
 
 # --------------------------------------------------
-# 撮影コマンド実行
+# 撮影実行
 # --------------------------------------------------
 if [[ $MODE == day ]]; then
   rpicam-jpeg -n \
@@ -84,12 +74,12 @@ else
 fi
 
 # --------------------------------------------------
-# Slack 非同期アップロード処理
+# Slack への非同期アップロード処理
 # --------------------------------------------------
 FILE_NAME=$(basename "$IMAGE_PATH")
 FILE_SIZE=$(stat -c%s "$IMAGE_PATH")
 
-# 1. ファイルアップロード URL と file_id を取得
+# 1. アップロード URL と file_id を取得
 res_url=$(curl -s -H "Authorization: Bearer ${TOKEN}" \
   -d "filename=${FILE_NAME}" \
   -d "length=${FILE_SIZE}" \
@@ -98,9 +88,13 @@ UPLOAD_URL=$(echo "$res_url" | grep -oP '"upload_url":"\K[^"]+')
 FILE_ID=$(echo "$res_url"    | grep -oP '"file_id":"\K[^"]+')
 ok=$(echo "$res_url"        | grep -oP '"ok":\K(true|false)')
 
-[[ "$ok" == "true" ]] || { echo "Error during getUploadURLExternal"; echo "$res_url"; exit 1; }
+if [[ "$ok" != "true" ]]; then
+  echo "Error: files.getUploadURLExternal failed" >&2
+  echo "$res_url" >&2
+  exit 1
+fi
 
-# 2. 取得した URL へファイル送信
+# 2. ファイルをアップロード
 curl -s -X POST -F "file=@${IMAGE_PATH}" "$UPLOAD_URL"
 
 # 3. completeUploadExternal で投稿完了
@@ -114,8 +108,8 @@ res_complete=$(curl -s -H "Authorization: Bearer ${TOKEN}" \
   https://slack.com/api/files.completeUploadExternal)
 
 if [[ "$(echo "$res_complete" | grep -oP '"ok":\K(true|false)')" != "true" ]]; then
-  echo "Error during completeUploadExternal"
-  echo "$res_complete"
+  echo "Error: files.completeUploadExternal failed" >&2
+  echo "$res_complete" >&2
   exit 1
 fi
 
