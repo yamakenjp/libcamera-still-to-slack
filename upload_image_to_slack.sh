@@ -34,8 +34,11 @@ sunset_jst=$(date -d "$sunset_iso"  +"%Y-%m-%d %H:%M:%S")
 # --------------------------------------------------
 # エポック秒変換（撮影ウィンドウ：日の出15分前～日の入り15分後）
 # --------------------------------------------------
-sunrise_minus_15_ts=$(date -d "$sunrise_jst - 15 minutes" +%s)
-sunset_plus_15_ts=$(date -d "$sunset_jst + 15 minutes" +%s)
+sunrise_ts=$(date -d "$sunrise_jst" +%s)
+sunset_ts=$(date -d "$sunset_jst"  +%s)
+# ここでシェル算術に任せる
+sunrise_minus_15_ts=$(( sunrise_ts - 15 * 60 ))
+sunset_plus_15_ts=$(( sunset_ts + 15 * 60 ))
 current_ts=$(date +%s)
 
 # --------------------------------------------------
