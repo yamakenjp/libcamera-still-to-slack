@@ -77,7 +77,9 @@ slack_external_upload() {
   fi
 
   # 2) 取得した URL にファイルを POST
-  curl -sf -F "file=@${IMAGE_PATH}" "$upload_url"
+  # デバッグ用に -v で詳細ログ、-S でエラー時の出力を有効化
+  curl -v -S -F "file=@${IMAGE_PATH}" "$upload_url" \
+    || { echo "ファイルアップロードに失敗しました (exit code: $?)" >&2; exit 1; }
 
   # 3) completeUploadExternal でチャンネルへ共有
   complete_resp=$(curl -sf -H "Authorization: Bearer ${TOKEN}" \
