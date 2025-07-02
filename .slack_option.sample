@@ -1,7 +1,17 @@
-# .slack_option
+# ~/.slack_option
+# Slack 外部アップロードスクリプトの設定ファイル
 
-# Slack APIトークン
-SLACK_TOKEN="xoxb-xxxxxxxxxxx-xxxxxxxxxxxx-xxxxxxxxxxxx"
+# — Slack 投稿先チャンネル ID —
+# 例: C01234567
+CHANNEL="C01234567"
 
-# SlackチャンネルID
-CHANNEL="C1234567890"
+# — Slack Bot Token —
+# Bot User OAuth Token（files:write スコープが必要）
+# 例: xoxb-1234abcd-5678efgh-ijkl9012
+SLACK_TOKEN="xoxb-XXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+# — 撮影場所の緯度・経度 —
+# 日の出・日の入りを取得するために使用
+# 例: 東京駅付近
+LATITUDE="35.681236"
+LONGITUDE="139.767125"
