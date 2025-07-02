@@ -15,8 +15,8 @@ IMAGE_PATH="/tmp/image.jpg"
 COMMENT="Photo taken at $(date +'%Y-%m-%d %H:%M:%S')!"
 CHANNEL="$CHANNEL"
 TOKEN="$SLACK_TOKEN"
-LATITUDE=43.1703
-LONGITUDE=141.3544
+LATITUDE=xx.xxxx
+LONGITUDE=xxx.xxxx
 
 # --------------------------------------------------
 # 当日のJST日付指定で日の出・日の入りを取得
