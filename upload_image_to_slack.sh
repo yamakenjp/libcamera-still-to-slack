@@ -5,126 +5,133 @@ set -euo pipefail
 
 # --------------------------------------------------
 # 設定ファイルを絶対パスで読み込み
+# （ここに CHANNEL, SLACK_TOKEN, LATITUDE, LONGITUDE を定義）
 # --------------------------------------------------
 source /home/pi/libcamera-still-to-slack/.slack_option
 
 # --------------------------------------------------
-# 変数定義
+# 定数定義
 # --------------------------------------------------
 IMAGE_PATH="/tmp/image.jpg"
 COMMENT="Photo taken at $(date +'%Y-%m-%d %H:%M:%S')!"
-CHANNEL="$CHANNEL"
+CHANNEL_ID="$CHANNEL"
 TOKEN="$SLACK_TOKEN"
-LATITUDE=xx.xxxx
-LONGITUDE=xxx.xxxx
 
 # --------------------------------------------------
-# 当日のJST日付指定で日の出・日の入りを取得
+# 日の出・日の入り取得＆JST変換関数
 # --------------------------------------------------
-LOCAL_DATE="$(date +'%Y-%m-%d')"
-response=$(curl -s \
-  "https://api.sunrise-sunset.org/json?lat=${LATITUDE}&lng=${LONGITUDE}&date=${LOCAL_DATE}&formatted=0")
-sunrise_iso=$(echo "$response" | grep -oP '"sunrise":"\K[^"]+')
-sunset_iso=$(echo "$response"  | grep -oP '"sunset":"\K[^"]+')
-
-# UTC→JST に変換
-sunrise_jst=$(date -d "$sunrise_iso" +"%Y-%m-%d %H:%M:%S")
-sunset_jst=$(date -d "$sunset_iso"  +"%Y-%m-%d %H:%M:%S")
-
-# --------------------------------------------------
-# エポック秒変換（撮影ウィンドウ：日の出15分前～日の入り15分後）
-# --------------------------------------------------
-sunrise_ts=$(date -d "$sunrise_jst" +%s)
-sunset_ts=$(date -d "$sunset_jst"  +%s)
-# ここでシェル算術に任せる
-sunrise_minus_15_ts=$(( sunrise_ts - 15 * 60 ))
-sunset_plus_15_ts=$(( sunset_ts + 15 * 60 ))
-current_ts=$(date +%s)
+get_sun_times() {
+  local date_iso lat lon resp
+  date_iso=$(date +'%Y-%m-%d')
+  lat=$LATITUDE; lon=$LONGITUDE
+  resp=$(curl -sf "https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&date=${date_iso}&formatted=0")
+  sunrise_iso=$(echo "$resp" | jq -r '.results.sunrise')
+  sunset_iso =$(echo "$resp" | jq -r '.results.sunset')
+  sunrise_jst=$(date -d "$sunrise_iso" +'%s')
+  sunset_jst=$(date -d "$sunset_iso"  +'%s')
+}
 
 # --------------------------------------------------
-# 撮影モード判定：  
-#   日の出15分前～日の入り15分後 → 昼モード  
-#   それ以外                   → 夜モード  
+# 撮影モード判定関数（日の出15分前～日の入り15分後を昼モードとする）
 # --------------------------------------------------
-if [[ $current_ts -ge $sunrise_minus_15_ts && $current_ts -lt $sunset_plus_15_ts ]]; then
-  echo "昼モードで撮影します"
-  MODE=day
-else
-  echo "夜モードで撮影します"
-  MODE=night
-fi
-
-# --------------------------------------------------
-# 撮影実行
-# --------------------------------------------------
-if [[ $MODE == day ]]; then
-  rpicam-jpeg -n \
-    --lens-position default \
-    --hdr auto \
-    --autofocus-mode auto \
-    --autofocus-speed fast \
-    --metering average \
-    -o "$IMAGE_PATH"
-else
-  rpicam-jpeg -n \
-    --lens-position default \
-    --shutter 100000000 \
-    --hdr auto \
-    --autofocus-mode auto \
-    --autofocus-speed fast \
-    --metering average \
-    -o "$IMAGE_PATH"
-fi
+determine_mode() {
+  local now_ts pre_ts post_ts
+  now_ts=$(date +%s)
+  pre_ts=$(( sunrise_jst - 15*60 ))
+  post_ts=$(( sunset_jst + 15*60 ))
+  if (( now_ts >= pre_ts && now_ts < post_ts )); then
+    MODE=day
+  else
+    MODE=night
+  fi
+}
 
 # --------------------------------------------------
-# EXIF に撮影時刻を埋め込む（ExifTool）
+# 画像撮影関数
 # --------------------------------------------------
-# 事前に `sudo apt-get install libimage-exiftool-perl` しておくこと
-TIMESTAMP="$(date +'%Y:%m:%d %H:%M:%S')"
-exiftool -overwrite_original \
-  -DateTimeOriginal="$TIMESTAMP" \
-  -CreateDate="$TIMESTAMP" \
-  -ModifyDate="$TIMESTAMP" \
-  "$IMAGE_PATH"
+capture_image() {
+  if [[ $MODE == day ]]; then
+    rpicam-jpeg -n \
+      --lens-position default \
+      --hdr auto \
+      --autofocus-mode auto \
+      --autofocus-speed fast \
+      --metering average \
+      -o "$IMAGE_PATH"
+  else
+    rpicam-jpeg -n \
+      --lens-position default \
+      --shutter 100000000 \
+      --hdr auto \
+      --autofocus-mode auto \
+      --autofocus-speed fast \
+      --metering average \
+      -o "$IMAGE_PATH"
+  fi
+
+  # EXIF埋め込み
+  TIMESTAMP=$(date +'%Y:%m:%d %H:%M:%S')
+  exiftool -overwrite_original \
+    -DateTimeOriginal="$TIMESTAMP" \
+    -CreateDate="$TIMESTAMP" \
+    -ModifyDate="$TIMESTAMP" \
+    "$IMAGE_PATH" >/dev/null
+}
 
 # --------------------------------------------------
-# Slack への非同期アップロード処理
+# Slack 外部アップロード関数
+# 1) getUploadURLExternal
+# 2) ファイル本体をアップロード
+# 3) completeUploadExternal
 # --------------------------------------------------
-FILE_NAME=$(basename "$IMAGE_PATH")
-FILE_SIZE=$(stat -c%s "$IMAGE_PATH")
+slack_external_upload() {
+  local file_name file_size resp upload_url file_id complete_resp err
 
-# 1. アップロード URL と file_id を取得
-res_url=$(curl -s -H "Authorization: Bearer ${TOKEN}" \
-  -d "filename=${FILE_NAME}" \
-  -d "length=${FILE_SIZE}" \
-  https://slack.com/api/files.getUploadURLExternal)
-UPLOAD_URL=$(echo "$res_url" | grep -oP '"upload_url":"\K[^"]+')
-FILE_ID=$(echo "$res_url"    | grep -oP '"file_id":"\K[^"]+')
-ok=$(echo "$res_url"        | grep -oP '"ok":\K(true|false)')
+  file_name=$(basename "$IMAGE_PATH")
+  file_size=$(stat -c%s "$IMAGE_PATH")
 
-if [[ "$ok" != "true" ]]; then
-  echo "Error: files.getUploadURLExternal failed" >&2
-  echo "$res_url" >&2
-  exit 1
-fi
+  # 1. アップロード URL と file_id を取得
+  resp=$(curl -sf -H "Authorization: Bearer ${TOKEN}" \
+    -d "filename=${file_name}" \
+    -d "length=${file_size}" \
+    https://slack.com/api/files.getUploadURLExternal)
 
-# 2. ファイルをアップロード
-curl -s -X POST -F "file=@${IMAGE_PATH}" "$UPLOAD_URL"
+  upload_url=$(echo "$resp" | jq -r '.upload_url')
+  file_id=$(echo "$resp"    | jq -r '.file_id')
+  ok=$(echo "$resp"         | jq -r '.ok')
 
-# 3. completeUploadExternal で投稿完了
-res_complete=$(curl -s -H "Authorization: Bearer ${TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "files":[{"id":"'"${FILE_ID}"'"}],
-        "channels":"'"${CHANNEL}"'",
-        "initial_comment":"'"${COMMENT}"'"
-      }' \
-  https://slack.com/api/files.completeUploadExternal)
+  if [[ "$ok" != "true" ]]; then
+    echo "Error in getUploadURLExternal: $(echo "$resp" | jq -r '.error')" >&2
+    exit 1
+  fi
 
-if [[ "$(echo "$res_complete" | grep -oP '"ok":\K(true|false)')" != "true" ]]; then
-  echo "Error: files.completeUploadExternal failed" >&2
-  echo "$res_complete" >&2
-  exit 1
-fi
+  # 2. 取得した URL へファイルを POST
+  curl -sf -F "file=@${IMAGE_PATH}" "$upload_url"
 
-echo "アップロードに成功しました！ file_id: ${FILE_ID}"
+  # 3. completeUploadExternal で投稿完了
+  complete_resp=$(curl -sf -H "Authorization: Bearer ${TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d '{
+          "files":[{"id":"'"${file_id}"'"}],
+          "channels":"'"${CHANNEL_ID}"'",
+          "initial_comment":"'"${COMMENT}"'"
+        }' \
+    https://slack.com/api/files.completeUploadExternal)
+
+  ok=$(echo "$complete_resp" | jq -r '.ok')
+  if [[ "$ok" != "true" ]]; then
+    echo "Error in completeUploadExternal: $(echo "$complete_resp" | jq -r '.error')" >&2
+    exit 1
+  fi
+
+  echo "アップロードに成功しました！ file_id: ${file_id}"
+}
+
+# --------------------------------------------------
+# メイン処理
+# --------------------------------------------------
+get_sun_times
+determine_mode
+echo "${MODE}モードで撮影します"
+capture_image
+slack_external_upload
