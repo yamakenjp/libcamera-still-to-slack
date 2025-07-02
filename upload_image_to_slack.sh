@@ -66,7 +66,7 @@ slack_external_upload() {
     -d "filename=${file_name}" -d "length=${file_size}" \
     https://slack.com/api/files.getUploadURLExternal)
   upload_url=$(echo "$resp" | jq -r '.upload_url')
-  file_id   =$(echo "$resp" | jq -r '.file_id')
+  file_id=$(echo "$resp" | jq -r '.file_id')
   ok=$(echo "$resp" | jq -r '.ok')
 
   if [[ "$ok" != "true" ]]; then
