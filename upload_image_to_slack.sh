@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-set -xeuo pipefail
+set -euo pipefail
 
-# 設定読み込み
-# vim: set filetype=sh
+# — 設定読み込み —
 source /home/pi/libcamera-still-to-slack/.slack_option
 
+# — 定数 —
 IMAGE_PATH="/tmp/image.jpg"
 COMMENT="Photo taken at $(date +'%Y-%m-%d %H:%M:%S')!"
 CHANNEL_ID="$CHANNEL"
@@ -23,7 +23,7 @@ get_sun_times() {
   sunset_jst=$(date -d "$sunset_iso"  +'%s')
 }
 
-# — 撮影モード判定（日の出15分前 ～ 日の入り15分後を昼モードとする） —
+# — 撮影モード判定 —
 determine_mode() {
   local now_ts pre_ts post_ts
   now_ts=$(date +%s)
@@ -36,7 +36,7 @@ determine_mode() {
   fi
 }
 
-# — 画像撮影＆EXIF埋め込み —
+# — 撮影＋EXIF埋め込み —
 capture_image() {
   if [[ $MODE == day ]]; then
     rpicam-jpeg -n --lens-position default --hdr auto \
@@ -59,29 +59,26 @@ capture_image() {
 # — Slack 外部アップロード処理 —
 slack_external_upload() {
   local file_name file_size resp upload_url file_id complete_resp ok
-
   file_name=$(basename "$IMAGE_PATH")
   file_size=$(stat -c%s "$IMAGE_PATH")
 
-  # 1) getUploadURLExternal で URL と file_id を取得
+  # 1) アップロード URL と file_id を取得
   resp=$(curl -sf -H "Authorization: Bearer ${TOKEN}" \
     -d "filename=${file_name}" -d "length=${file_size}" \
     https://slack.com/api/files.getUploadURLExternal)
   upload_url=$(echo "$resp" | jq -r '.upload_url')
   file_id=$(echo "$resp"    | jq -r '.file_id')
   ok=$(echo "$resp"         | jq -r '.ok')
-
   if [[ "$ok" != "true" ]]; then
-    echo "Error in getUploadURLExternal: $(echo "$resp" | jq -r '.error')" >&2
+    echo "Error (getUploadURLExternal): $(echo "$resp" | jq -r '.error')" >&2
     exit 1
   fi
 
-  # 2) 取得した URL にファイルを POST
-  # デバッグ用に -v で詳細ログ、-S でエラー時の出力を有効化
-  curl -v -S -F "file=@${IMAGE_PATH}" "$upload_url" \
-    || { echo "ファイルアップロードに失敗しました (exit code: $?)" >&2; exit 1; }
+  # 2) 本体をアップロード
+  curl -sf -F "file=@${IMAGE_PATH}" "$upload_url" \
+    || { echo "Error: ファイル本体のアップロードに失敗"; exit 1; }
 
-  # 3) completeUploadExternal でチャンネルへ共有
+  # 3) completeUploadExternal で共有完了
   complete_resp=$(curl -sf -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
     -d '{
@@ -91,16 +88,15 @@ slack_external_upload() {
         }' \
     https://slack.com/api/files.completeUploadExternal)
   ok=$(echo "$complete_resp" | jq -r '.ok')
-
   if [[ "$ok" != "true" ]]; then
-    echo "Error in completeUploadExternal: $(echo "$complete_resp" | jq -r '.error')" >&2
+    echo "Error (completeUploadExternal): $(echo "$complete_resp" | jq -r '.error')" >&2
     exit 1
   fi
 
-  # 共有後のパーマリンクを出力
+  # 共有リンク出力
   permalink=$(echo "$complete_resp" | jq -r '.files[0].permalink')
-  echo "アップロードに成功しました！ file_id: ${file_id}"
-  echo "Slack での公開リンク: ${permalink}"
+  echo "アップロード成功！ file_id=${file_id}"
+  echo "公開リンク: ${permalink}"
 }
 
 # — メイン処理 —
