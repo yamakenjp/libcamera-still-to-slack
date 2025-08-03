@@ -39,13 +39,30 @@ determine_mode() {
 # — 撮影＋EXIF埋め込み —
 capture_image() {
   if [[ $MODE == day ]]; then
-    rpicam-jpeg -n --lens-position default --hdr auto \
-      --autofocus-mode auto --autofocus-speed fast \
-      --metering average -o "$IMAGE_PATH"
+      rpicam-jpeg -n \
+          --quality 95 \
+          --awb daylight \
+          --exposure normal \
+          --autofocus-mode auto \
+          --autofocus-range full \
+          --autofocus-on-capture \
+          --autofocus-speed normal \
+          --lens-position default \
+          --denoise auto \
+          --immediate \
+          -o "$IMAGE_PATH"
   else
-    rpicam-jpeg -n --lens-position default --shutter 100000000 \
-      --hdr auto --autofocus-mode auto --autofocus-speed fast \
-      --metering average -o "$IMAGE_PATH"
+      rpicam-jpeg -n \
+          --quality 95 \
+          --shutter 1100000 \
+          --autofocus-mode auto \
+          --autofocus-range full \
+          --autofocus-on-capture \
+          --autofocus-speed normal \
+          --lens-position default \
+          --denoise auto \
+          --immediate \
+  -o "$IMAGE_PATH"
   fi
 
   TIMESTAMP=$(date +'%Y:%m:%d %H:%M:%S')
