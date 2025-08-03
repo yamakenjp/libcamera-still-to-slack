@@ -54,7 +54,7 @@ capture_image() {
   else
       rpicam-jpeg -n \
           --quality 95 \
-          --shutter 1100000 \
+          --shutter 100000000 \
           --autofocus-mode auto \
           --autofocus-range full \
           --autofocus-on-capture \
