@@ -43,6 +43,7 @@ capture_image() {
           --quality 95 \
           --awb daylight \
           --exposure normal \
+          --hdr auto \
           --autofocus-mode auto \
           --autofocus-range full \
           --autofocus-on-capture \
@@ -55,6 +56,7 @@ capture_image() {
       rpicam-jpeg -n \
           --quality 95 \
           --shutter 100000000 \
+          --hdr auto \
           --autofocus-mode auto \
           --autofocus-range full \
           --autofocus-on-capture \
